@@ -1,6 +1,10 @@
 @import './_variables.css';
 
+body {
+  margin:32px;
+}
 .demo.resnet50 {
+  max-width:700px;
   .top-container {
     margin: 10px;
     position: relative;
@@ -84,10 +88,21 @@
         }
       }
 
-      .canvas-container {
+      .webcam-viewer {
+        padding-left:6px;
+        padding-right:6px;
         display: inline-flex;
-        justify-content: flex-end;
+        
+        canvas {
+          background: white;
+        }
+      }
 
+      .canvas-container {
+        padding-left:6px;
+        padding-right:6px;
+        display: inline-flex;
+        
         canvas {
           background: white;
         }

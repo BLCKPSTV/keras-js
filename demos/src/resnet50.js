@@ -10,13 +10,13 @@ import { ARCHITECTURE_DIAGRAM, ARCHITECTURE_CONNECTIONS } from './resnet50-arch'
 
 const MODEL_FILEPATHS_DEV = {
   model: '/demos/data/resnet50/resnet50.json',
-  weights: '/demos/data/resnet50/resnet50_weights.buf',
+  weights: '/demos/data/resnet50/resnet50_weights.buf', //'https://transcranial.github.io/keras-js-demos-data/resnet50/resnet50_weights.buf',
   metadata: '/demos/data/resnet50/resnet50_metadata.json'
 }
 const MODEL_FILEPATHS_PROD = {
-  model: 'demos/data/resnet50/resnet50.json',
+  model: '/demos/data/resnet50/resnet50.json',
   weights: 'https://transcranial.github.io/keras-js-demos-data/resnet50/resnet50_weights.buf',
-  metadata: 'demos/data/resnet50/resnet50_metadata.json'
+  metadata: '/demos/data/resnet50/resnet50_metadata.json'
 }
 const MODEL_CONFIG = {
   filepaths: (process.env.NODE_ENV === 'production') ? MODEL_FILEPATHS_PROD : MODEL_FILEPATHS_DEV
@@ -67,10 +67,6 @@ export const ResNet50 = Vue.extend({
       }
       return rows
     },
-    layersWithResults: function () {
-      // store as computed property for reactivity
-      return this.model.layersWithResults
-    },
     outputClasses: function () {
       if (!this.output) {
         let empty = []
@@ -86,106 +82,42 @@ export const ResNet50 = Vue.extend({
   ready: function () {
     this.model.ready().then(() => {
       this.modelLoading = false
-
-      this.architectureDiagramPaths = []
-      setTimeout(() => {
-        this.architectureConnections.forEach(conn => {
-          const containerElem = document.getElementsByClassName('architecture-container')[0]
-          const fromElem = document.getElementById(conn.from)
-          const toElem = document.getElementById(conn.to)
-          const containerElemCoords = containerElem.getBoundingClientRect()
-          const fromElemCoords = fromElem.getBoundingClientRect()
-          const toElemCoords = toElem.getBoundingClientRect()
-          const xContainer = containerElemCoords.left
-          const yContainer = containerElemCoords.top
-          const xFrom = fromElemCoords.left + fromElemCoords.width / 2 - xContainer
-          const yFrom = fromElemCoords.top + fromElemCoords.height / 2 - yContainer
-          const xTo = toElemCoords.left + toElemCoords.width / 2 - xContainer
-          const yTo = toElemCoords.top + toElemCoords.height / 2 - yContainer
-
-          let path = `M${xFrom},${yFrom} L${xTo},${yTo}`
-          if (conn.corner === 'top-right') {
-            path = `M${xFrom},${yFrom} L${xTo - 10},${yFrom} Q${xTo},${yFrom} ${xTo},${yFrom + 10} L${xTo},${yTo}`
-          } else if (conn.corner === 'bottom-left') {
-            path = `M${xFrom},${yFrom} L${xFrom},${yTo - 10} Q${xFrom},${yTo} ${xFrom + 10},${yTo} L${xTo},${yTo}`
-          } else if (conn.corner === 'top-left') {
-            path = `M${xFrom},${yFrom} L${xTo + 10},${yFrom} Q${xTo},${yFrom} ${xTo},${yFrom + 10} L${xTo},${yTo}`
-          }
-
-          this.architectureDiagramPaths.push(path)
-        })
-      }, 1000)
+      var self = this;
+      var ctx = document.getElementById('hellocam').getContext('2d')
+      var cam = new camvas(ctx, function(video, dt) {
+         ctx.drawImage(video, 0, 0, 224, 224)
+         self.classifyWebcam();        
+      })
     })
   },
 
   methods: {
 
-    closeInfoPanel: function () {
-      this.showInfoPanel = false
-    },
-
     toggleGpu: function () {
       this.model.toggleGpu(!this.useGpu)
     },
 
-    toggleComputationFlow: function () {
-      this.model.layerCallPauses = !this.showComputationFlow
-    },
-
-    imageURLInputChanged: function (e) {
-      this.imageURLSelect = null
-      this.loadImageToCanvas(this.imageURLInput)
-    },
-
-    imageURLSelectChanged: function (e) {
-      this.imageURLInput = this.imageURLSelect
-      this.loadImageToCanvas(this.imageURLSelect)
-    },
-
-    loadImageToCanvas: function (url) {
-      if (!url) {
-        this.clearAll()
-        return
-      }
-
-      this.imageLoading = true
-      loadImage(
-        url,
-        img => {
-          if (img.type === 'error') {
-            this.imageLoadingError = true
-            this.imageLoading = false
-          } else {
-            // load image data onto input canvas
-            const ctx = document.getElementById('input-canvas').getContext('2d')
-            ctx.drawImage(img, 0, 0)
-            this.imageLoadingError = false
-            this.imageLoading = false
-            this.modelRunning = true
-            // model predict
-            this.$nextTick(function () {
-              setTimeout(() => {
-                this.runModel()
-              }, 200)
-            })
-          }
-        },
-        {
-          maxWidth: 224,
-          maxHeight: 224,
-          cover: true,
-          crop: true,
-          canvas: true,
-          crossOrigin: 'Anonymous'
-        }
-      )
+    classifyWebcam: function (e) {
+      if (this.modelRunning) {
+        return;
+      }      
+      this.modelRunning = true;
+      this.$nextTick(function () {
+        setTimeout(() => {
+          this.runModel()
+        }, 200)
+      });      
     },
 
     runModel: function () {
-      const ctx = document.getElementById('input-canvas').getContext('2d')
+      const sourceCanvas = document.getElementById('hellocam')
+      const destCtx = document.getElementById('tempcam').getContext('2d')
+      const ctx = sourceCanvas.getContext('2d')
       const imageData = ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height)
       const { data, width, height } = imageData
 
+      destCtx.drawImage(sourceCanvas, 0, 0);      
+      
       // data processing
       // see https://github.com/fchollet/keras/blob/master/keras/applications/imagenet_utils.py
       let dataTensor = ndarray(new Float32Array(data), [width, height, 4])
@@ -201,6 +133,10 @@ export const ResNet50 = Vue.extend({
         'input_1': dataProcessedTensor.data
       }
       this.model.predict(inputData).then(outputData => {
+        var sourceCanvas = document.getElementById('tempcam')
+        var destCtx = document.getElementById('input-canvas').getContext('2d')
+        destCtx.drawImage(sourceCanvas, 0, 0);
+
         this.output = outputData['fc1000']
         this.modelRunning = false
       })
@@ -213,8 +149,6 @@ export const ResNet50 = Vue.extend({
       this.imageLoading = false
       this.imageLoadingError = false
       this.output = null
-
-      this.model.layersWithResults = []
 
       const ctx = document.getElementById('input-canvas').getContext('2d')
       ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height)

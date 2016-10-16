@@ -23,6 +23,26 @@ body {
   }
 }
 
+.description {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  color:#000;
+  a {
+    border-bottom: 0.5px dashed #888;
+    color:#000;
+  }
+  a:hover {
+    background-color:#1abc9c;
+    color:#fff;
+  }
+  span {
+    color: $color-1;
+    margin-right: 20px;
+  }
+}
+
 .subtitle {
   color: $color-3;
 }
